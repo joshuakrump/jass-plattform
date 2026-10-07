@@ -136,7 +136,8 @@ export default function Home() {
           <legend>Bot-Schwierigkeit</legend>
           <label><input type="radio" name="difficulty" value="easy" checked={difficulty === "easy"} onChange={() => setDifficulty("easy")} /> Leicht</label>
           <label><input type="radio" name="difficulty" value="medium" checked={difficulty === "medium"} onChange={() => setDifficulty("medium")} /> Mittel</label>
-          <span>{game ? "Für diese Runde festgelegt." : "Leicht: Zufall · Mittel: einfache Teamstrategie"}</span>
+          <label><input type="radio" name="difficulty" value="hard" checked={difficulty === "hard"} onChange={() => setDifficulty("hard")} /> Schwer</label>
+          <span>{game ? "Für diese Runde festgelegt." : difficulty === "hard" ? "Schätzt unbekannte Karten und vergleicht mögliche Stichverläufe." : difficulty === "medium" ? "Einfache Teamstrategie." : "Zufällige erlaubte Karten."}</span>
         </fieldset>
 
         <section className="jass-scoreboard" aria-label="Punktestand">

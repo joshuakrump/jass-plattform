@@ -58,7 +58,7 @@ export function sortHand(hand: Card[]): Card[] {
     return ranks.indexOf(a.rank) - ranks.indexOf(b.rank);
   });
 }
-export type BotDifficulty = "easy" | "medium";
+export type BotDifficulty = "easy" | "medium" | "hard";
 
 export function getCardImage(card: Card): string {
   const suitFiles: Record<Suit, string> = {

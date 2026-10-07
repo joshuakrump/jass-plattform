@@ -142,6 +142,8 @@ export function playBotTurn(game: GameState): GameState {
       difficulty: game.difficulty,
       playerIndex: game.currentPlayer,
       trickPlayers: game.trick.map((play) => play.playerIndex),
+      playedCards: game.history.flatMap((entry) => entry.plays.map((play) => play.card)),
+      handSizes: game.hands.map((hand) => hand.length),
     }
   );
 
