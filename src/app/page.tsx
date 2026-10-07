@@ -5,7 +5,6 @@ import "./jass-table.css";
 import Image from "next/image";
 
 import {
-  dealCards,
   sortHand,
   getCardImage,
   type BotDifficulty,
@@ -13,13 +12,13 @@ import {
   type GameMode,
 } from "@/lib/jass/cards";
 
-import { SAVED_GAME_KEY, serializeGame, parseSavedGame } from "@/lib/jass/saved-game";
+import { SAVED_GAME_KEY, parseSavedGame } from "@/lib/jass/saved-game";
+import { MATCH_KEY, createMatch, totalScores, matchWinner, selectMode, advanceRound, rightOf, serializeMatch, parseMatch, type MatchState } from "@/lib/jass/match";
 
 import { getPlayableCards } from "@/lib/jass/rules";
 import { chooseBotGameMode } from "@/lib/jass/bot";
 
 import {
-  createGame,
   playTurn,
   playBotTurn,
   startNextTrick,
@@ -39,13 +38,21 @@ const gameModes: GameMode[] = [
 ];
 
 export default function Home() {
-  const [dealtHands, setDealtHands] = useState<Card[][]>([]);
-  const [game, setGame] = useState<GameState | null>(null);
-  const [shifted, setShifted] = useState(false);
+  const [match, setMatch] = useState<MatchState | null>(null);
   const [saveMessage, setSaveMessage] = useState("");
   const [difficulty, setDifficulty] = useState<BotDifficulty>("easy");
+  const game = match && !match.choosing ? match.game : null;
+  const hands = match?.game.hands ?? [];
+  const winnerTeam = match ? matchWinner(match) : null;
+  const scores = match ? totalScores(match) : [0, 0];
 
-  const hands = game ? game.hands : dealtHands;
+  function setGame(update: (current: GameState | null) => GameState | null) {
+    setMatch((current) => {
+      if (!current || current.choosing || matchWinner(current) !== null) return current;
+      const next = update(current.game);
+      return next && next !== current.game ? { ...current, game: next } : current;
+    });
+  }
   const roundFinished = game?.completedTricks === 9;
   const trickFinished = game?.trick.length === 4;
 
@@ -53,7 +60,7 @@ export default function Home() {
     game !== null &&
     game.currentPlayer === 0 &&
     !trickFinished &&
-    !roundFinished;
+    !roundFinished && winnerTeam === null;
 
   const playableCards =
     game && canPlay
@@ -66,7 +73,7 @@ export default function Home() {
 
   useEffect(() => {
     if (
-      !game ||
+      !game || winnerTeam !== null ||
       game.currentPlayer === 0 ||
       game.trick.length === 4 ||
       game.completedTricks >= 9
@@ -80,45 +87,53 @@ export default function Home() {
 
     // Ein neuer Spielstand oder Neustart verwirft den vorherigen Timer.
     return () => window.clearTimeout(timer);
-  }, [game]);
+  }, [game, winnerTeam]);
 
   useEffect(() => {
-    if (!game) return;
-    try {
-      window.localStorage.setItem(SAVED_GAME_KEY, serializeGame(game, shifted));
-    } catch {
-      // Spielen funktioniert auch, wenn der Browser das Speichern blockiert.
-    }
-  }, [game, shifted]);
+    if (!match) return;
+    try { window.localStorage.setItem(MATCH_KEY, serializeMatch(match)); } catch { /* Speichern ist optional. */ }
+  }, [match]);
+
+  useEffect(() => {
+    if (!match || !match.choosing || rightOf(match.dealer) === 0) return;
+    const timer = window.setTimeout(() => {
+      const next = selectMode(match, chooseBotGameMode(match.game.hands[rightOf(match.dealer)]));
+      setMatch((current) => current === match ? next : current);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [match]);
+
+  useEffect(() => {
+    if (!match || match.choosing || match.game.completedTricks !== 9 || matchWinner(match) !== null) return;
+    const timer = window.setTimeout(() => {
+      const next = advanceRound(match);
+      setMatch((current) => current === match ? next : current);
+    }, 2200);
+    return () => window.clearTimeout(timer);
+  }, [match]);
 
   function resumeRound() {
     try {
-      const saved = parseSavedGame(window.localStorage.getItem(SAVED_GAME_KEY));
+      let saved = parseMatch(window.localStorage.getItem(MATCH_KEY));
       if (!saved) {
-        setSaveMessage("Keine fortsetzbare Runde gespeichert. Teile neue Karten aus.");
-        return;
+        const legacy = parseSavedGame(window.localStorage.getItem(SAVED_GAME_KEY));
+        if (legacy) saved = { dealer: (legacy.game.startingPlayer + 3) % 4, round: 1, bankedScores: [0, 0], game: legacy.game, choosing: false, shifted: legacy.shifted };
       }
-      setGame(saved.game);
+      if (!saved) { setSaveMessage("Keine fortsetzbare Partie gespeichert. Starte eine neue Partie."); return; }
+      setMatch(saved);
       setDifficulty(saved.game.difficulty);
-      setShifted(saved.shifted);
-      setSaveMessage("Gespeicherte Runde geladen.");
-    } catch {
-      setSaveMessage("Der Browser erlaubt keinen Zugriff auf gespeicherte Runden.");
-    }
+      setSaveMessage("Gespeicherte Partie geladen.");
+    } catch { setSaveMessage("Der Browser erlaubt keinen Zugriff auf gespeicherte Partien."); }
   }
 
   function dealNewRound() {
-    setDealtHands(dealCards());
-    setGame(null);
-    setShifted(false);
+    setMatch(createMatch(difficulty));
     setSaveMessage("");
-    try { window.localStorage.removeItem(SAVED_GAME_KEY); } catch { /* Optional */ }
   }
 
   function selectGameMode(mode: GameMode) {
-    if (game || dealtHands.length !== 4) return;
-
-    setGame(createGame(dealtHands, mode, difficulty));
+    if (!match?.choosing || rightOf(match.dealer) !== 0) return;
+    setMatch(selectMode(match, mode));
   }
 
   function playCard(card: Card) {
@@ -132,9 +147,8 @@ export default function Home() {
   }
 
   function shiftToPartner() {
-    if (game || dealtHands.length !== 4) return;
-    setShifted(true);
-    setGame(createGame(dealtHands, chooseBotGameMode(dealtHands[2]), difficulty));
+    if (!match?.choosing || rightOf(match.dealer) !== 0) return;
+    setMatch(selectMode(match, chooseBotGameMode(match.game.hands[2]), true));
   }
 
   function nextTrick() {
@@ -158,36 +172,38 @@ export default function Home() {
             <h1>Am Jasstisch</h1>
           </div>
           <button type="button" onClick={dealNewRound} className="jass-button jass-button-secondary">
-            {hands.length ? "Neu austeilen" : "Karten austeilen"}
+            {!match ? "Partie starten" : winnerTeam !== null ? "Neue Partie" : "Partie neu starten"}
           </button>
         </header>
 
         {!game && hands.length === 0 && (
           <section className="jass-resume">
-            <p>Schon eine Runde begonnen? Dein letzter Spielstand wird in diesem Browser gespeichert.</p>
-            <button type="button" onClick={resumeRound} className="jass-button jass-button-secondary">Gespeicherte Runde fortsetzen</button>
+            <p>Schon eine Partie begonnen? Dein letzter Spielstand wird in diesem Browser gespeichert.</p>
+            <button type="button" onClick={resumeRound} className="jass-button jass-button-secondary">Gespeicherte Partie fortsetzen</button>
           </section>
         )}
         {saveMessage && <p className="jass-save-message" role="status">{saveMessage}</p>}
 
-        <fieldset className="jass-difficulty" disabled={game !== null}>
+        <fieldset className="jass-difficulty" disabled={match !== null}>
           <legend>Bot-Schwierigkeit</legend>
           <label><input type="radio" name="difficulty" value="easy" checked={difficulty === "easy"} onChange={() => setDifficulty("easy")} /> Leicht</label>
           <label><input type="radio" name="difficulty" value="medium" checked={difficulty === "medium"} onChange={() => setDifficulty("medium")} /> Mittel</label>
           <label><input type="radio" name="difficulty" value="hard" checked={difficulty === "hard"} onChange={() => setDifficulty("hard")} /> Schwer</label>
-          <span>{game ? "Für diese Runde festgelegt." : difficulty === "hard" ? "Schätzt unbekannte Karten und vergleicht mögliche Stichverläufe." : difficulty === "medium" ? "Einfache Teamstrategie." : "Zufällige erlaubte Karten."}</span>
+          <span>{match ? "Für diese Partie festgelegt." : difficulty === "hard" ? "Schätzt unbekannte Karten und vergleicht mögliche Stichverläufe." : difficulty === "medium" ? "Einfache Teamstrategie." : "Zufällige erlaubte Karten."}</span>
         </fieldset>
+
+        {match && <p className="jass-save-message">Runde {match.round} · Geber: {players[match.dealer]} · Ansage und erste Karte: {players[rightOf(match.dealer)]}</p>}
 
         <section className="jass-scoreboard" aria-label="Punktestand">
           {teams.map((team, index) => (
             <div key={team} className="jass-score">
               <span>{team}</span>
-              <strong>{game?.scores[index] ?? 0}</strong>
+              <strong>{scores[index]} / 2500</strong>
             </div>
           ))}
         </section>
 
-        {hands.length > 0 && !game && (
+        {match?.choosing && rightOf(match.dealer) === 0 && (
           <section className="jass-mode-panel" aria-label="Spielart wählen">
             <h2>Was spielen wir?</h2>
             <div className="jass-mode-buttons">
@@ -206,11 +222,11 @@ export default function Home() {
         <section className="jass-table" aria-label="Jasstisch">
           <div className="jass-table-info" aria-live="polite">
             {game ? `${game.gameMode} · Stich ${currentTrickNumber}/9` : "Dein Jasstisch"}
-            {shifted && game && <span>Von Bot 2 gewählt</span>}
+            {match?.shifted && game && <span>Von Bot 2 gewählt</span>}
           </div>
 
           {visibleSeats.map((playerIndex) => (
-            <div key={playerIndex} className={`jass-seat jass-seat-${playerIndex} ${game?.currentPlayer === playerIndex && !trickFinished && !roundFinished ? "jass-seat-active" : ""}`}>
+            <div key={playerIndex} className={`jass-seat jass-seat-${playerIndex} ${game?.currentPlayer === playerIndex && !trickFinished && !roundFinished && winnerTeam === null ? "jass-seat-active" : ""}`}>
               <div className="jass-avatar" aria-hidden="true">{playerIndex === 2 ? "P" : playerIndex}</div>
               <strong>{players[playerIndex]}</strong>
               <span>{playerIndex === 2 ? "Dein Partner" : "Gegner"}</span>
@@ -236,20 +252,22 @@ export default function Home() {
 
           {!game && (
             <p className="jass-table-empty">
-              {hands.length ? "Wähle eine Spielart oder schiebe zu deinem Partner." : "Ein Tisch. Vier Plätze. Zeit für einen Jass."}
+              {hands.length ? rightOf(match!.dealer) === 0 ? "Wähle eine Spielart oder schiebe zu deinem Partner." : `${players[rightOf(match!.dealer)]} wählt die Spielart …` : "Ein Tisch. Vier Plätze. Zeit für einen Jass."}
             </p>
           )}
           <div className="jass-your-seat"><strong>Du</strong><span>Partner von Bot 2</span></div>
         </section>
 
         <section className="jass-status" aria-live="polite">
-          {!game ? (
-            <p>{hands.length ? "Deine Karten liegen bereit." : "Teile die Karten aus, um zu beginnen."}</p>
+          {winnerTeam !== null ? (
+            <div><h2>Partie gewonnen: {teams[winnerTeam]}</h2><p>{scores[0]} : {scores[1]} Punkte</p></div>
+          ) : !game ? (
+            <p>{hands.length ? rightOf(match!.dealer) === 0 ? "Du sagst an und spielst die erste Karte." : `${players[rightOf(match!.dealer)]} sagt an …` : "Starte eine Partie bis 2.500 Punkte."}</p>
           ) : roundFinished ? (
             <div>
               <h2>Runde beendet</h2>
-              <p>{game.scores[0] === game.scores[1] ? "Unentschieden." : `Gewonnen: ${teams[game.scores[0] > game.scores[1] ? 0 : 1]}`}</p>
-              <small>Gesamtpunkte: {game.scores[0] + game.scores[1]}</small>
+              <p>Rundenpunkte: {game.scores[0]} : {game.scores[1]}</p>
+              <small>Die nächste Person gibt gleich automatisch aus.</small>
             </div>
           ) : trickFinished && game.winner !== null ? (
             <>

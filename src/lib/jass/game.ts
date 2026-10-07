@@ -20,6 +20,7 @@ export type CompletedTrick = {
 
 export type GameState = {
   hands: Card[][];
+  startingPlayer: number;
   gameMode: GameMode;
   difficulty: BotDifficulty;
   trick: PlayedCard[];
@@ -33,14 +34,16 @@ export type GameState = {
 export function createGame(
   hands: Card[][],
   gameMode: GameMode,
-  difficulty: BotDifficulty = "easy"
+  difficulty: BotDifficulty = "easy",
+  startingPlayer = 0
 ): GameState {
   return {
     hands: hands.map((hand) => [...hand]),
     gameMode,
     difficulty,
     trick: [],
-    currentPlayer: 0,
+    currentPlayer: startingPlayer,
+    startingPlayer,
     winner: null,
     completedTricks: 0,
     scores: [0, 0],

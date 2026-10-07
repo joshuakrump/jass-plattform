@@ -53,7 +53,9 @@ export function parseSavedGame(text: string | null): SavedGame | null {
     ]);
     if (initial.some((hand) => hand.length !== 9) || new Set(initial.flat().map((card) => card.id)).size !== 36) return null;
 
-    let game = createGame(initial, raw.gameMode as GameState["gameMode"], raw.difficulty as GameState["difficulty"]);
+    const startingPlayer = raw.startingPlayer ?? 0;
+    if (!Number.isInteger(startingPlayer) || (startingPlayer as number) < 0 || (startingPlayer as number) > 3) return null;
+    let game = createGame(initial, raw.gameMode as GameState["gameMode"], raw.difficulty as GameState["difficulty"], startingPlayer as number);
     function replay(plays: PlayedCard[]) {
       for (const play of plays) {
         if (game.currentPlayer !== play.playerIndex) throw new Error("Falsche Reihenfolge");

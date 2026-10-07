@@ -111,3 +111,5 @@
 .jass-resume { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:14px 16px; margin-bottom:18px; border:1px solid #345441; border-radius:12px; }
 .jass-resume p, .jass-save-message { font-size:12px; color:#c7d4c9; }
 .jass-save-message { margin-bottom:12px; }
+.jass-score { flex-wrap:wrap; }
+.jass-score strong { font-size:clamp(18px,3vw,28px); white-space:nowrap; }
