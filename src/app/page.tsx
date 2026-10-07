@@ -98,233 +98,139 @@ export default function Home() {
     setGame(startNextTrick(game));
   }
 
+  const firstTrick = game?.history.length === 1 ? game.history[0] : null;
+  const visibleSeats = [2, 1, 3];
+  const currentTrickNumber = game
+    ? Math.min(game.completedTricks + (trickFinished ? 0 : 1), 9)
+    : 1;
+
   return (
-    <main className="min-h-screen bg-emerald-950 p-6 text-white">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold">Jass-Plattform</h1>
+    <main className="jass-page">
+      <div className="jass-shell">
+        <header className="jass-header">
+          <div>
+            <p className="jass-eyebrow">SCHIEBER · DU UND DEIN PARTNER</p>
+            <h1>Am Jasstisch</h1>
+          </div>
+          <button type="button" onClick={dealNewRound} className="jass-button jass-button-secondary">
+            {hands.length ? "Neu austeilen" : "Karten austeilen"}
+          </button>
+        </header>
 
-        <button
-          type="button"
-          onClick={dealNewRound}
-          className="mt-6 rounded-lg bg-amber-400 px-6 py-3 font-bold text-emerald-950 hover:bg-amber-300"
-        >
-          Mischen und austeilen
-        </button>
-      </header>
+        <section className="jass-scoreboard" aria-label="Punktestand">
+          {teams.map((team, index) => (
+            <div key={team} className="jass-score">
+              <span>{team}</span>
+              <strong>{game?.scores[index] ?? 0}</strong>
+            </div>
+          ))}
+        </section>
 
-      {hands.length === 0 && (
-        <p className="text-center text-emerald-200">
-          Teile zuerst die Karten aus.
-        </p>
-      )}
-
-      {hands.length > 0 && (
-        <section className="mb-8 text-center">
-          <h2 className="mb-3 text-xl font-bold">Spielart</h2>
-
-          <div className="flex flex-wrap justify-center gap-2">
-            {gameModes.map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => selectGameMode(mode)}
-                disabled={game !== null}
-                aria-pressed={game?.gameMode === mode}
-                className={`rounded-lg px-4 py-2 font-bold disabled:cursor-not-allowed ${
-                  game?.gameMode === mode
-                    ? "bg-amber-400 text-emerald-950"
-                    : "bg-emerald-800 text-white hover:bg-emerald-700"
-                }`}
-              >
-                {mode}
+        {hands.length > 0 && !game && (
+          <section className="jass-mode-panel" aria-label="Spielart wählen">
+            <h2>Was spielen wir?</h2>
+            <div className="jass-mode-buttons">
+              {gameModes.map((mode) => (
+                <button key={mode} type="button" onClick={() => selectGameMode(mode)} className="jass-button jass-button-secondary">
+                  {mode}
+                </button>
+              ))}
+              <button type="button" onClick={shiftToPartner} className="jass-button jass-button-primary">
+                Schieben zu Bot 2
               </button>
+            </div>
+          </section>
+        )}
+
+        <section className="jass-table" aria-label="Jasstisch">
+          <div className="jass-table-info" aria-live="polite">
+            {game ? `${game.gameMode} · Stich ${currentTrickNumber}/9` : "Dein Jasstisch"}
+            {shifted && game && <span>Von Bot 2 gewählt</span>}
+          </div>
+
+          {visibleSeats.map((playerIndex) => (
+            <div key={playerIndex} className={`jass-seat jass-seat-${playerIndex}`}>
+              <div className="jass-avatar" aria-hidden="true">{playerIndex === 2 ? "P" : playerIndex}</div>
+              <strong>{players[playerIndex]}</strong>
+              <span>{playerIndex === 2 ? "Dein Partner" : "Gegner"}</span>
+              <div className="jass-mini-hand" aria-hidden="true">
+                {Array.from({ length: hands[playerIndex]?.length ?? 0 }, (_, index) => (
+                  <i key={index} />
+                ))}
+              </div>
+              <small>{hands[playerIndex]?.length ?? 0} Karten</small>
+            </div>
+          ))}
+
+          <div className="jass-trick" aria-label="Aktueller Stich">
+            {game?.trick.map((play) => (
+              <div key={play.card.id} className={`jass-table-card jass-table-card-${play.playerIndex}`}>
+                <span className="jass-card-owner">{players[play.playerIndex]}</span>
+                <div className={`jass-card-face ${play.card.suit === "Rosen" || play.card.suit === "Schellen" ? "jass-card-red" : ""}`}>
+                  <strong>{play.card.rank}</strong>
+                  <span aria-hidden="true">{symbols[play.card.suit]}</span>
+                  <small>{play.card.suit}</small>
+                </div>
+              </div>
             ))}
           </div>
 
-          {!game && dealtHands.length === 4 && (
-            <button
-              type="button"
-              onClick={shiftToPartner}
-              className="mt-4 rounded-lg border border-emerald-400 px-6 py-3 font-bold hover:bg-emerald-800"
-            >
-              Schieben zu Bot 2
-            </button>
+          {!game && (
+            <p className="jass-table-empty">
+              {hands.length ? "Wähle eine Spielart oder schiebe zu deinem Partner." : "Ein Tisch. Vier Plätze. Zeit für einen Jass."}
+            </p>
           )}
-
-          <p className="mt-3 text-emerald-200" aria-live="polite">
-            {game
-              ? `${shifted ? "Bot 2 hat gewählt" : "Gewählte Spielart"}: ${game.gameMode}`
-              : "Wähle eine Spielart. Deine Auswahl startet die Runde."}
-          </p>
+          <div className="jass-your-seat"><strong>Du</strong><span>Partner von Bot 2</span></div>
         </section>
-      )}
 
-      {game && (
-        <>
-          <section className="mx-auto mb-8 grid max-w-5xl grid-cols-2 gap-4">
-            {teams.map((team, index) => (
-              <div
-                key={team}
-                className="rounded-xl bg-emerald-800 p-4 text-center"
-              >
-                <p>{team}</p>
-                <p className="mt-1 text-3xl font-bold">
-                  {game.scores[index]}
-                </p>
-              </div>
-            ))}
-          </section>
-
-          <section className="mx-auto mb-8 max-w-5xl rounded-xl bg-emerald-900 p-6 text-center">
-            <h2 className="mb-4 text-xl font-bold">
-              Stich{" "}
-              {Math.min(
-                game.completedTricks + (trickFinished ? 0 : 1),
-                9
-              )}{" "}
-              von 9
-            </h2>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {game.trick.map((play) => (
-                <div
-                  key={play.card.id}
-                  className="rounded-lg bg-white p-4 text-slate-800"
-                >
-                  <p className="mb-2 text-sm font-bold">
-                    {players[play.playerIndex]}
-                  </p>
-                  <p className="text-4xl">
-                    {symbols[play.card.suit]}
-                  </p>
-                  <p className="mt-2 font-bold">{play.card.rank}</p>
-                  <p className="text-sm">{play.card.suit}</p>
-                </div>
-              ))}
+        <section className="jass-status" aria-live="polite">
+          {!game ? (
+            <p>{hands.length ? "Deine Karten liegen bereit." : "Teile die Karten aus, um zu beginnen."}</p>
+          ) : roundFinished ? (
+            <div>
+              <h2>Runde beendet</h2>
+              <p>{game.scores[0] === game.scores[1] ? "Unentschieden." : `Gewonnen: ${teams[game.scores[0] > game.scores[1] ? 0 : 1]}`}</p>
+              <small>Gesamtpunkte: {game.scores[0] + game.scores[1]}</small>
             </div>
+          ) : trickFinished && game.winner !== null ? (
+            <>
+              <p><strong>{players[game.winner]}</strong> gewinnt den Stich.</p>
+              <button type="button" onClick={nextTrick} className="jass-button jass-button-primary">Nächster Stich</button>
+            </>
+          ) : (
+            <p>Du bist dran. Wähle eine erlaubte Karte.</p>
+          )}
+        </section>
 
-            {game.winner !== null ? (
-              <p className="mt-4 text-xl font-bold text-amber-300">
-                Stich gewonnen: {players[game.winner]}
-              </p>
-            ) : (
-              <p className="mt-4 text-emerald-200">
-                Du bist dran. Wähle eine erlaubte Karte.
-              </p>
-            )}
-
-            {trickFinished && !roundFinished && (
-              <button
-                type="button"
-                onClick={nextTrick}
-                className="mt-4 rounded-lg bg-amber-400 px-6 py-3 font-bold text-emerald-950 hover:bg-amber-300"
-              >
-                Nächster Stich
-              </button>
-            )}
-
-            {roundFinished && (
-              <div className="mt-4 text-amber-300">
-                <p className="text-xl font-bold">Runde beendet!</p>
-
-                <p className="mt-2">
-                  {game.scores[0] === game.scores[1]
-                    ? "Unentschieden."
-                    : `Gewonnen: ${
-                        teams[game.scores[0] > game.scores[1] ? 0 : 1]
-                      }`}
-                </p>
-
-                <p className="mt-2">
-                  Gesamtpunkte: {game.scores[0] + game.scores[1]}
-                </p>
-              </div>
-            )}
-          </section>
-        </>
-      )}
-
-      <div className="mx-auto max-w-5xl space-y-8">
-        {hands.map((hand, playerIndex) => (
-          <section key={players[playerIndex]}>
-            <h2 className="mb-3 text-xl font-bold">
-              {players[playerIndex]} · {hand.length} Karten
-            </h2>
-
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-9">
-              {sortHand(hand).map((card) => {
-                if (playerIndex !== 0) {
-                  return (
-                    <div
-                      key={card.id}
-                      aria-label="Verdeckte Karte"
-                      className="flex aspect-[2/3] items-center justify-center rounded-xl border-4 border-white bg-blue-900 shadow-lg"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="text-3xl text-blue-200"
-                      >
-                        ✦
-                      </span>
-                    </div>
-                  );
-                }
-
-                const enabled = playableCards.some(
-                  (allowed) => allowed.id === card.id
-                );
-
+        {hands.length > 0 && (
+          <section className="jass-hand-panel" aria-label="Deine Hand">
+            <div className="jass-hand-heading"><h2>Deine Hand</h2><span>{hands[0].length} Karten</span></div>
+            <div className="jass-hand">
+              {sortHand(hands[0]).map((card) => {
+                const enabled = playableCards.some((allowed) => allowed.id === card.id);
                 return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={() => playCard(card)}
-                    disabled={!enabled}
+                  <button key={card.id} type="button" onClick={() => playCard(card)} disabled={!enabled}
                     aria-label={`${card.suit} ${card.rank} spielen`}
-                    className={`flex aspect-[2/3] flex-col justify-between rounded-xl bg-white p-3 shadow-lg disabled:cursor-not-allowed ${
-                      enabled
-                        ? "cursor-pointer ring-2 ring-amber-400 hover:bg-amber-50"
-                        : "opacity-60"
-                    } ${
-                      card.suit === "Rosen" || card.suit === "Schellen"
-                        ? "text-red-700"
-                        : "text-slate-800"
-                    }`}
-                  >
-                    <span className="font-bold">{card.rank}</span>
-                    <span className="text-center text-4xl">
-                      {symbols[card.suit]}
-                    </span>
-                    <span className="text-right text-sm">
-                      {card.suit}
-                    </span>
+                    className={`jass-hand-card jass-card-face ${enabled ? "jass-card-playable" : ""} ${card.suit === "Rosen" || card.suit === "Schellen" ? "jass-card-red" : ""}`}>
+                    <strong>{card.rank}</strong>
+                    <span aria-hidden="true">{symbols[card.suit]}</span>
+                    <small>{card.suit}</small>
                   </button>
                 );
               })}
             </div>
           </section>
-        ))}
-      </div>
+        )}
 
-      {game && game.history.length === 1 && (
-        <section className="mx-auto mt-8 max-w-5xl">
-          <details className="rounded-lg bg-emerald-900 p-4">
-            <summary className="cursor-pointer font-bold">
-              Ersten Stich nochmals anschauen
-            </summary>
-
-            <ul className="mt-3 space-y-1 text-emerald-200">
-              {game.history[0].plays.map((play) => (
-                <li key={play.card.id}>
-                  {players[play.playerIndex]}:{" "}
-                  {symbols[play.card.suit]} {play.card.suit}{" "}
-                  {play.card.rank}
-                </li>
-              ))}
-            </ul>
+        {firstTrick && (
+          <details className="jass-recall">
+            <summary>Ersten Stich nochmals anschauen</summary>
+            <ul>{firstTrick.plays.map((play) => (
+              <li key={play.card.id}>{players[play.playerIndex]}: {symbols[play.card.suit]} {play.card.suit} {play.card.rank}</li>
+            ))}</ul>
           </details>
-        </section>
-      )}
+        )}
+      </div>
     </main>
   );
 }
