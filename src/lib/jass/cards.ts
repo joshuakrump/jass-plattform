@@ -45,3 +45,5 @@ export function dealCards(): Card[][] {
     deck.slice(27, 36),
   ];
 }
+
+export type GameMode = Suit | "Obenabe" | "Undenufe";
