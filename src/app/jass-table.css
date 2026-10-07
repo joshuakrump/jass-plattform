@@ -91,3 +91,8 @@
   .jass-status { font-size:12px; gap:12px; }
 }
 .jass-seat-2 .jass-mini-hand { display:none; }
+
+.jass-seat-active .jass-avatar { border-color:#f1cd7f; box-shadow:0 0 0 3px #e7bd6640; }
+.jass-table-card .jass-card-face { animation:jass-card-enter .22s ease-out; }
+@keyframes jass-card-enter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media(prefers-reduced-motion:reduce) { .jass-table-card .jass-card-face { animation:none; } }
