@@ -13,6 +13,8 @@ import {
   type GameMode,
 } from "@/lib/jass/cards";
 
+import { SAVED_GAME_KEY, serializeGame, parseSavedGame } from "@/lib/jass/saved-game";
+
 import { getPlayableCards } from "@/lib/jass/rules";
 import { chooseBotGameMode } from "@/lib/jass/bot";
 
@@ -40,6 +42,7 @@ export default function Home() {
   const [dealtHands, setDealtHands] = useState<Card[][]>([]);
   const [game, setGame] = useState<GameState | null>(null);
   const [shifted, setShifted] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [difficulty, setDifficulty] = useState<BotDifficulty>("easy");
 
   const hands = game ? game.hands : dealtHands;
@@ -79,10 +82,37 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [game]);
 
+  useEffect(() => {
+    if (!game) return;
+    try {
+      window.localStorage.setItem(SAVED_GAME_KEY, serializeGame(game, shifted));
+    } catch {
+      // Spielen funktioniert auch, wenn der Browser das Speichern blockiert.
+    }
+  }, [game, shifted]);
+
+  function resumeRound() {
+    try {
+      const saved = parseSavedGame(window.localStorage.getItem(SAVED_GAME_KEY));
+      if (!saved) {
+        setSaveMessage("Keine fortsetzbare Runde gespeichert. Teile neue Karten aus.");
+        return;
+      }
+      setGame(saved.game);
+      setDifficulty(saved.game.difficulty);
+      setShifted(saved.shifted);
+      setSaveMessage("Gespeicherte Runde geladen.");
+    } catch {
+      setSaveMessage("Der Browser erlaubt keinen Zugriff auf gespeicherte Runden.");
+    }
+  }
+
   function dealNewRound() {
     setDealtHands(dealCards());
     setGame(null);
     setShifted(false);
+    setSaveMessage("");
+    try { window.localStorage.removeItem(SAVED_GAME_KEY); } catch { /* Optional */ }
   }
 
   function selectGameMode(mode: GameMode) {
@@ -131,6 +161,14 @@ export default function Home() {
             {hands.length ? "Neu austeilen" : "Karten austeilen"}
           </button>
         </header>
+
+        {!game && hands.length === 0 && (
+          <section className="jass-resume">
+            <p>Schon eine Runde begonnen? Dein letzter Spielstand wird in diesem Browser gespeichert.</p>
+            <button type="button" onClick={resumeRound} className="jass-button jass-button-secondary">Gespeicherte Runde fortsetzen</button>
+          </section>
+        )}
+        {saveMessage && <p className="jass-save-message" role="status">{saveMessage}</p>}
 
         <fieldset className="jass-difficulty" disabled={game !== null}>
           <legend>Bot-Schwierigkeit</legend>
