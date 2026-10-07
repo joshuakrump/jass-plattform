@@ -123,6 +123,23 @@ export function playTurn(
   };
 }
 
+// Genau ein Bot-Zug; die Oberfläche bestimmt den zeitlichen Abstand.
+export function playBotTurn(game: GameState): GameState {
+  if (
+    game.currentPlayer === 0 ||
+    game.trick.length === 4 ||
+    game.completedTricks >= 9
+  ) return game;
+
+  const card = chooseBotCard(
+    game.hands[game.currentPlayer],
+    game.trick.map((play) => play.card),
+    game.gameMode
+  );
+
+  return card ? playTurn(game, card.id) : game;
+}
+
 export function playBotsUntilHuman(
   game: GameState
 ): GameState {
@@ -153,7 +170,8 @@ export function playBotsUntilHuman(
 }
 
 export function startNextTrick(
-  game: GameState
+  game: GameState,
+  autoPlayBots = true
 ): GameState {
   if (
     game.trick.length !== 4 ||
@@ -163,10 +181,12 @@ export function startNextTrick(
     return game;
   }
 
-  return playBotsUntilHuman({
+  const next = {
     ...game,
     trick: [],
     winner: null,
     currentPlayer: game.winner,
-  });
+  };
+
+  return autoPlayBots ? playBotsUntilHuman(next) : next;
 }
