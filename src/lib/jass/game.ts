@@ -1,5 +1,6 @@
 import { type Card, type GameMode } from "./cards";
 import { chooseBotCard } from "./bot";
+
 import {
   getPlayableCards,
   getTrickWinner,
@@ -11,6 +12,12 @@ export type PlayedCard = {
   card: Card;
 };
 
+export type CompletedTrick = {
+  plays: PlayedCard[];
+  winner: number;
+  points: number;
+};
+
 export type GameState = {
   hands: Card[][];
   gameMode: GameMode;
@@ -19,6 +26,7 @@ export type GameState = {
   winner: number | null;
   completedTricks: number;
   scores: [number, number];
+  history: CompletedTrick[];
 };
 
 export function createGame(
@@ -33,6 +41,7 @@ export function createGame(
     winner: null,
     completedTricks: 0,
     scores: [0, 0],
+    history: [],
   };
 }
 
@@ -40,7 +49,7 @@ export function playTurn(
   game: GameState,
   cardId: string
 ): GameState {
-  if (game.trick.length === 4 || game.completedTricks === 9) {
+  if (game.trick.length === 4 || game.completedTricks >= 9) {
     return game;
   }
 
@@ -54,6 +63,7 @@ export function playTurn(
     game.gameMode
   ).find((candidate) => candidate.id === cardId);
 
+  // Ungültige Karten verändern den Spielstand nicht.
   if (!card) return game;
 
   const hands = game.hands.map((playerHand, index) =>
@@ -62,8 +72,12 @@ export function playTurn(
       : [...playerHand]
   );
 
-  const trick = [...game.trick, { playerIndex, card }];
+  const trick: PlayedCard[] = [
+    ...game.trick,
+    { playerIndex, card },
+  ];
 
+  // Solange der Stich nicht vollständig ist, folgt der nächste Spieler.
   if (trick.length < 4) {
     return {
       ...game,
@@ -76,6 +90,7 @@ export function playTurn(
   const cards = trick.map((play) => play.card);
   const winningPosition = getTrickWinner(cards, game.gameMode);
   const winner = trick[winningPosition].playerIndex;
+
   const completedTricks = game.completedTricks + 1;
 
   const points = getTrickPoints(
@@ -84,8 +99,10 @@ export function playTurn(
     completedTricks === 9
   );
 
+  // Team 0: Du und Bot 2. Team 1: Bot 1 und Bot 3.
   const scores: [number, number] = [...game.scores];
-  scores[winner % 2] += points;
+  const winnerTeam = winner % 2;
+  scores[winnerTeam] += points;
 
   return {
     ...game,
@@ -95,6 +112,14 @@ export function playTurn(
     currentPlayer: winner,
     completedTricks,
     scores,
+    history: [
+      ...game.history,
+      {
+        plays: trick,
+        winner,
+        points,
+      },
+    ],
   };
 }
 
@@ -118,6 +143,7 @@ export function playBotsUntilHuman(
 
     const updated = playTurn(next, card.id);
 
+    // Verhindert eine Endlosschleife bei einem ungültigen Zug.
     if (updated === next) break;
 
     next = updated;
@@ -132,7 +158,7 @@ export function startNextTrick(
   if (
     game.trick.length !== 4 ||
     game.winner === null ||
-    game.completedTricks === 9
+    game.completedTricks >= 9
   ) {
     return game;
   }

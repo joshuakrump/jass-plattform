@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import {
   dealCards,
+  sortHand,
   type Card,
   type Suit,
   type GameMode,
@@ -157,10 +158,12 @@ export default function Home() {
 
           <section className="mx-auto mb-8 max-w-5xl rounded-xl bg-emerald-900 p-6 text-center">
             <h2 className="mb-4 text-xl font-bold">
-              Stich {Math.min(
+              Stich{" "}
+              {Math.min(
                 game.completedTricks + (trickFinished ? 0 : 1),
                 9
-              )} von 9
+              )}{" "}
+              von 9
             </h2>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -203,9 +206,8 @@ export default function Home() {
 
             {roundFinished && (
               <div className="mt-4 text-amber-300">
-                <p className="text-xl font-bold">
-                  Runde beendet!
-                </p>
+                <p className="text-xl font-bold">Runde beendet!</p>
+
                 <p className="mt-2">
                   {game.scores[0] === game.scores[1]
                     ? "Unentschieden."
@@ -213,6 +215,7 @@ export default function Home() {
                         teams[game.scores[0] > game.scores[1] ? 0 : 1]
                       }`}
                 </p>
+
                 <p className="mt-2">
                   Gesamtpunkte: {game.scores[0] + game.scores[1]}
                 </p>
@@ -230,12 +233,27 @@ export default function Home() {
             </h2>
 
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-9">
-              {hand.map((card) => {
-                const enabled =
-                  playerIndex === 0 &&
-                  playableCards.some(
-                    (allowed) => allowed.id === card.id
+              {sortHand(hand).map((card) => {
+                if (playerIndex !== 0) {
+                  return (
+                    <div
+                      key={card.id}
+                      aria-label="Verdeckte Karte"
+                      className="flex aspect-[2/3] items-center justify-center rounded-xl border-4 border-white bg-blue-900 shadow-lg"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="text-3xl text-blue-200"
+                      >
+                        ✦
+                      </span>
+                    </div>
                   );
+                }
+
+                const enabled = playableCards.some(
+                  (allowed) => allowed.id === card.id
+                );
 
                 return (
                   <button
@@ -268,6 +286,26 @@ export default function Home() {
           </section>
         ))}
       </div>
+
+      {game && game.history.length === 1 && (
+        <section className="mx-auto mt-8 max-w-5xl">
+          <details className="rounded-lg bg-emerald-900 p-4">
+            <summary className="cursor-pointer font-bold">
+              Ersten Stich nochmals anschauen
+            </summary>
+
+            <ul className="mt-3 space-y-1 text-emerald-200">
+              {game.history[0].plays.map((play) => (
+                <li key={play.card.id}>
+                  {players[play.playerIndex]}:{" "}
+                  {symbols[play.card.suit]} {play.card.suit}{" "}
+                  {play.card.rank}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </section>
+      )}
     </main>
   );
 }

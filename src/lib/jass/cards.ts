@@ -47,3 +47,14 @@ export function dealCards(): Card[][] {
 }
 
 export type GameMode = Suit | "Obenabe" | "Undenufe";
+
+export function sortHand(hand: Card[]): Card[] {
+  return [...hand].sort((a, b) => {
+    const suitDifference =
+      suits.indexOf(a.suit) - suits.indexOf(b.suit);
+
+    if (suitDifference !== 0) return suitDifference;
+
+    return ranks.indexOf(a.rank) - ranks.indexOf(b.rank);
+  });
+}
