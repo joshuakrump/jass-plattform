@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import "./jass-table.css";
 
 import {
   dealCards,
