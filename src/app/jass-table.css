@@ -113,3 +113,8 @@
 .jass-save-message { margin-bottom:12px; }
 .jass-score { flex-wrap:wrap; }
 .jass-score strong { font-size:clamp(18px,3vw,28px); white-space:nowrap; }
+
+.jass-trump-panel { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px 16px; padding:14px 18px; margin-bottom:16px; border:2px solid #e7bd66; border-radius:12px; background:#243d2c; }
+.jass-trump-panel > span { font-size:12px; color:#d4dfd2; text-transform:uppercase; letter-spacing:1px; }
+.jass-trump-panel strong { font-size:24px; color:#f5d58b; }
+.jass-trump-panel small { font-size:12px; color:#c7d4c9; }

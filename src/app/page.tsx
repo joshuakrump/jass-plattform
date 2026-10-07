@@ -203,6 +203,14 @@ export default function Home() {
           ))}
         </section>
 
+        {match && (
+          <section className="jass-trump-panel" aria-label="Aktuelle Spielart" aria-live="polite" aria-atomic="true">
+            <span>{game && game.gameMode !== "Obenabe" && game.gameMode !== "Undenufe" ? "Trumpf" : "Spielart"}</span>
+            <strong>{game ? game.gameMode : "Wird gewählt …"}</strong>
+            {game && (game.gameMode === "Obenabe" || game.gameMode === "Undenufe") && <small>Ohne Trumpf</small>}
+          </section>
+        )}
+
         {match?.choosing && rightOf(match.dealer) === 0 && (
           <section className="jass-mode-panel" aria-label="Spielart wählen">
             <h2>Was spielen wir?</h2>
