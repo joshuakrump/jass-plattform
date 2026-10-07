@@ -11,6 +11,7 @@ import {
 } from "@/lib/jass/cards";
 
 import { getPlayableCards } from "@/lib/jass/rules";
+import { chooseBotGameMode } from "@/lib/jass/bot";
 
 import {
   createGame,
@@ -42,6 +43,7 @@ const gameModes: GameMode[] = [
 export default function Home() {
   const [dealtHands, setDealtHands] = useState<Card[][]>([]);
   const [game, setGame] = useState<GameState | null>(null);
+  const [shifted, setShifted] = useState(false);
 
   const hands = game ? game.hands : dealtHands;
   const roundFinished = game?.completedTricks === 9;
@@ -65,6 +67,7 @@ export default function Home() {
   function dealNewRound() {
     setDealtHands(dealCards());
     setGame(null);
+    setShifted(false);
   }
 
   function selectGameMode(mode: GameMode) {
@@ -81,6 +84,12 @@ export default function Home() {
     if (next === game) return;
 
     setGame(playBotsUntilHuman(next));
+  }
+
+  function shiftToPartner() {
+    if (game || dealtHands.length !== 4) return;
+    setShifted(true);
+    setGame(createGame(dealtHands, chooseBotGameMode(dealtHands[2])));
   }
 
   function nextTrick() {
@@ -132,9 +141,19 @@ export default function Home() {
             ))}
           </div>
 
-          <p className="mt-3 text-emerald-200">
+          {!game && dealtHands.length === 4 && (
+            <button
+              type="button"
+              onClick={shiftToPartner}
+              className="mt-4 rounded-lg border border-emerald-400 px-6 py-3 font-bold hover:bg-emerald-800"
+            >
+              Schieben zu Bot 2
+            </button>
+          )}
+
+          <p className="mt-3 text-emerald-200" aria-live="polite">
             {game
-              ? `Gewählte Spielart: ${game.gameMode}`
+              ? `${shifted ? "Bot 2 hat gewählt" : "Gewählte Spielart"}: ${game.gameMode}`
               : "Wähle eine Spielart. Deine Auswahl startet die Runde."}
           </p>
         </section>
