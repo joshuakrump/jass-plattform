@@ -1,4 +1,4 @@
-import { type Card, type GameMode } from "./cards";
+import { type Card, type GameMode, type BotDifficulty } from "./cards";
 import { chooseBotCard } from "./bot";
 
 import {
@@ -21,6 +21,7 @@ export type CompletedTrick = {
 export type GameState = {
   hands: Card[][];
   gameMode: GameMode;
+  difficulty: BotDifficulty;
   trick: PlayedCard[];
   currentPlayer: number;
   winner: number | null;
@@ -31,11 +32,13 @@ export type GameState = {
 
 export function createGame(
   hands: Card[][],
-  gameMode: GameMode
+  gameMode: GameMode,
+  difficulty: BotDifficulty = "easy"
 ): GameState {
   return {
     hands: hands.map((hand) => [...hand]),
     gameMode,
+    difficulty,
     trick: [],
     currentPlayer: 0,
     winner: null,
@@ -134,7 +137,12 @@ export function playBotTurn(game: GameState): GameState {
   const card = chooseBotCard(
     game.hands[game.currentPlayer],
     game.trick.map((play) => play.card),
-    game.gameMode
+    game.gameMode,
+    {
+      difficulty: game.difficulty,
+      playerIndex: game.currentPlayer,
+      trickPlayers: game.trick.map((play) => play.playerIndex),
+    }
   );
 
   return card ? playTurn(game, card.id) : game;
@@ -150,15 +158,7 @@ export function playBotsUntilHuman(
     next.trick.length < 4 &&
     next.completedTricks < 9
   ) {
-    const card = chooseBotCard(
-      next.hands[next.currentPlayer],
-      next.trick.map((play) => play.card),
-      next.gameMode
-    );
-
-    if (!card) break;
-
-    const updated = playTurn(next, card.id);
+    const updated = playBotTurn(next);
 
     // Verhindert eine Endlosschleife bei einem ungültigen Zug.
     if (updated === next) break;

@@ -1,18 +1,61 @@
-import { suits, type Card, type GameMode } from "./cards";
-import { getPlayableCards } from "./rules";
+import { suits, ranks, type Card, type GameMode, type BotDifficulty } from "./cards";
+import { getPlayableCards, getWinningCardIndex, getCardPoints } from "./rules";
+
+export type BotContext = {
+  difficulty: BotDifficulty;
+  playerIndex: number;
+  trickPlayers: number[];
+};
 
 export function chooseBotCard(
   hand: Card[],
   trick: Card[],
-  gameMode: GameMode
+  gameMode: GameMode,
+  context?: BotContext
 ): Card | null {
-  const allowedCards = getPlayableCards(hand, trick, gameMode);
+  const allowed = getPlayableCards(hand, trick, gameMode);
+  if (allowed.length === 0) return null;
+  if (!context || context.difficulty === "easy") {
+    return allowed[Math.floor(Math.random() * allowed.length)];
+  }
 
-  if (allowedCards.length === 0) return null;
+  function strength(card: Card): number {
+    if (card.suit === gameMode) {
+      const order = ["6", "7", "8", "Banner", "Ober", "König", "Ass", "9", "Under"];
+      return 20 + order.indexOf(card.rank);
+    }
+    const index = ranks.indexOf(card.rank);
+    return gameMode === "Undenufe" ? ranks.length - 1 - index : index;
+  }
+  const cheapest = (cards: Card[]) => [...cards].sort((a, b) => strength(a) - strength(b))[0];
 
-  const randomIndex = Math.floor(Math.random() * allowedCards.length);
+  if (trick.length === 0) {
+    // Eine starke eigene Karte eröffnet den Stich.
+    return [...allowed].sort((a, b) => strength(b) - strength(a))[0];
+  }
 
-  return allowedCards[randomIndex];
+  const winningIndex = getWinningCardIndex(trick, gameMode);
+  const winningPlayer = context.trickPlayers[winningIndex];
+  const partnerLeads = winningPlayer !== undefined && winningPlayer % 2 === context.playerIndex % 2;
+
+  if (partnerLeads) {
+    // Den Partner unterstützen, dabei nach Möglichkeit Trumpf sparen.
+    const nonTrumps = allowed.filter((card) => card.suit !== gameMode);
+    const candidates = nonTrumps.length ? nonTrumps : allowed;
+    return [...candidates].sort((a, b) =>
+      getCardPoints(b, gameMode) - getCardPoints(a, gameMode) || strength(a) - strength(b)
+    )[0];
+  }
+
+  const winningCards = allowed.filter((card) =>
+    getWinningCardIndex([...trick, card], gameMode) === trick.length
+  );
+  if (winningCards.length) return cheapest(winningCards);
+
+  // Kann er nicht stechen, gibt der Bot möglichst wenige Punkte ab.
+  return [...allowed].sort((a, b) =>
+    getCardPoints(a, gameMode) - getCardPoints(b, gameMode) || strength(a) - strength(b)
+  )[0];
 }
 
 // Eine einfache Heuristik, die ausschliesslich die eigene Hand bewertet.

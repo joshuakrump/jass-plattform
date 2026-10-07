@@ -58,3 +58,15 @@ export function sortHand(hand: Card[]): Card[] {
     return ranks.indexOf(a.rank) - ranks.indexOf(b.rank);
   });
 }
+export type BotDifficulty = "easy" | "medium";
+
+export function getCardImage(card: Card): string {
+  const suitFiles: Record<Suit, string> = {
+    Rosen: "hearts", Schellen: "clubs", Eicheln: "diamonds", Schilten: "spades",
+  };
+  const rankFiles: Record<Rank, number> = {
+    "6": 6, "7": 7, "8": 8, "9": 9,
+    Banner: 10, Under: 11, Ober: 12, König: 13, Ass: 14,
+  };
+  return `/cards/swiss/${suitFiles[card.suit]}_${rankFiles[card.rank]}.gif`;
+}

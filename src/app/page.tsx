@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import "./jass-table.css";
+import Image from "next/image";
 
 import {
   dealCards,
   sortHand,
+  getCardImage,
+  type BotDifficulty,
   type Card,
-  type Suit,
   type GameMode,
 } from "@/lib/jass/cards";
 
@@ -21,13 +23,6 @@ import {
   startNextTrick,
   type GameState,
 } from "@/lib/jass/game";
-
-const symbols: Record<Suit, string> = {
-  Rosen: "🌹",
-  Schellen: "🔔",
-  Eicheln: "🌰",
-  Schilten: "🛡️",
-};
 
 const players = ["Du", "Bot 1", "Bot 2", "Bot 3"];
 const teams = ["Du und Bot 2", "Bot 1 und Bot 3"];
@@ -45,6 +40,7 @@ export default function Home() {
   const [dealtHands, setDealtHands] = useState<Card[][]>([]);
   const [game, setGame] = useState<GameState | null>(null);
   const [shifted, setShifted] = useState(false);
+  const [difficulty, setDifficulty] = useState<BotDifficulty>("easy");
 
   const hands = game ? game.hands : dealtHands;
   const roundFinished = game?.completedTricks === 9;
@@ -92,7 +88,7 @@ export default function Home() {
   function selectGameMode(mode: GameMode) {
     if (game || dealtHands.length !== 4) return;
 
-    setGame(createGame(dealtHands, mode));
+    setGame(createGame(dealtHands, mode, difficulty));
   }
 
   function playCard(card: Card) {
@@ -108,7 +104,7 @@ export default function Home() {
   function shiftToPartner() {
     if (game || dealtHands.length !== 4) return;
     setShifted(true);
-    setGame(createGame(dealtHands, chooseBotGameMode(dealtHands[2])));
+    setGame(createGame(dealtHands, chooseBotGameMode(dealtHands[2]), difficulty));
   }
 
   function nextTrick() {
@@ -135,6 +131,13 @@ export default function Home() {
             {hands.length ? "Neu austeilen" : "Karten austeilen"}
           </button>
         </header>
+
+        <fieldset className="jass-difficulty" disabled={game !== null}>
+          <legend>Bot-Schwierigkeit</legend>
+          <label><input type="radio" name="difficulty" value="easy" checked={difficulty === "easy"} onChange={() => setDifficulty("easy")} /> Leicht</label>
+          <label><input type="radio" name="difficulty" value="medium" checked={difficulty === "medium"} onChange={() => setDifficulty("medium")} /> Mittel</label>
+          <span>{game ? "Für diese Runde festgelegt." : "Leicht: Zufall · Mittel: einfache Teamstrategie"}</span>
+        </fieldset>
 
         <section className="jass-scoreboard" aria-label="Punktestand">
           {teams.map((team, index) => (
@@ -186,9 +189,7 @@ export default function Home() {
               <div key={play.card.id} className={`jass-table-card jass-table-card-${play.playerIndex}`}>
                 <span className="jass-card-owner">{players[play.playerIndex]}</span>
                 <div className={`jass-card-face ${play.card.suit === "Rosen" || play.card.suit === "Schellen" ? "jass-card-red" : ""}`}>
-                  <strong>{play.card.rank}</strong>
-                  <span aria-hidden="true">{symbols[play.card.suit]}</span>
-                  <small>{play.card.suit}</small>
+                  <Image src={getCardImage(play.card)} alt={`${play.card.suit} ${play.card.rank}`} width={161} height={247} unoptimized className="jass-card-image" />
                 </div>
               </div>
             ))}
@@ -231,9 +232,7 @@ export default function Home() {
                   <button key={card.id} type="button" onClick={() => playCard(card)} disabled={!enabled}
                     aria-label={`${card.suit} ${card.rank} spielen`}
                     className={`jass-hand-card jass-card-face ${enabled ? "jass-card-playable" : ""} ${card.suit === "Rosen" || card.suit === "Schellen" ? "jass-card-red" : ""}`}>
-                    <strong>{card.rank}</strong>
-                    <span aria-hidden="true">{symbols[card.suit]}</span>
-                    <small>{card.suit}</small>
+                    <Image src={getCardImage(card)} alt="" width={161} height={247} unoptimized className="jass-card-image" />
                   </button>
                 );
               })}
@@ -245,10 +244,13 @@ export default function Home() {
           <details className="jass-recall">
             <summary>Ersten Stich nochmals anschauen</summary>
             <ul>{firstTrick.plays.map((play) => (
-              <li key={play.card.id}>{players[play.playerIndex]}: {symbols[play.card.suit]} {play.card.suit} {play.card.rank}</li>
+              <li key={play.card.id}>{players[play.playerIndex]}: {play.card.suit} {play.card.rank}</li>
             ))}</ul>
           </details>
         )}
+        <footer className="jass-card-credit">
+          Kartenbilder: <a href="https://github.com/JoelNiklaus/jass-server" target="_blank" rel="noreferrer">jass-server / webplatformz</a> · <a href="/cards/swiss/LICENSE.txt">MIT-Lizenz</a>
+        </footer>
       </div>
     </main>
   );

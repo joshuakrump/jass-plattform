@@ -82,6 +82,14 @@ export function getTrickWinner(
     throw new Error("Ein vollständiger Stich braucht vier Karten.");
   }
 
+  return getWinningCardIndex(trick, gameMode);
+}
+
+// Auch bei einem noch unvollständigen Stich die führende Karte bestimmen.
+export function getWinningCardIndex(trick: Card[], gameMode: GameMode): number {
+  if (trick.length === 0 || trick.length > 4) {
+    throw new Error("Ein Stich enthält eine bis vier Karten.");
+  }
   const leadSuit = trick[0].suit;
 
   function strength(card: Card): number {
