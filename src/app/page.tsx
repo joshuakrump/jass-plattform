@@ -9,12 +9,15 @@ import {
   type GameMode,
 } from "@/lib/jass/cards";
 
-import {
-  getTrickWinner,
-  getTrickPoints,
-} from "@/lib/jass/rules";
+import { getPlayableCards } from "@/lib/jass/rules";
 
-import { chooseBotCard } from "@/lib/jass/bot";
+import {
+  createGame,
+  playTurn,
+  playBotsUntilHuman,
+  startNextTrick,
+  type GameState,
+} from "@/lib/jass/game";
 
 const symbols: Record<Suit, string> = {
   Rosen: "🌹",
@@ -24,75 +27,67 @@ const symbols: Record<Suit, string> = {
 };
 
 const players = ["Du", "Bot 1", "Bot 2", "Bot 3"];
+const teams = ["Du und Bot 2", "Bot 1 und Bot 3"];
 
-const gameModes = [
-  "Rosen", "Schellen", "Eicheln", "Schilten", "Obenabe", "Undenufe",
-] as const;
+const gameModes: GameMode[] = [
+  "Rosen",
+  "Schellen",
+  "Eicheln",
+  "Schilten",
+  "Obenabe",
+  "Undenufe",
+];
 
 export default function Home() {
-  const [hands, setHands] = useState<Card[][]>([]);
-  const [gameMode, setGameMode] = useState<GameMode | null>(null);
-  const [playedCard, setPlayedCard] = useState<Card | null>(null);
-  const [trick, setTrick] = useState<Card[]>([]);
-  const winnerIndex =
-  gameMode && trick.length === 4
-    ? getTrickWinner(trick, gameMode)
-    : null;
-  const trickPoints =
-  gameMode && trick.length === 4
-    ? getTrickPoints(trick, gameMode)
-    : 0;
+  const [dealtHands, setDealtHands] = useState<Card[][]>([]);
+  const [game, setGame] = useState<GameState | null>(null);
 
-  const winnerTeam =
-  winnerIndex === null
-    ? null
-    : winnerIndex % 2 === 0
-      ? "Du und Bot 2"
-      : "Bot 1 und Bot 3";
+  const hands = game ? game.hands : dealtHands;
+  const roundFinished = game?.completedTricks === 9;
+  const trickFinished = game?.trick.length === 4;
 
-function startNewRound() {
-  setHands(dealCards());
-  setGameMode(null);
-  setPlayedCard(null);
-  setTrick([]);
-}
+  const canPlay =
+    game !== null &&
+    game.currentPlayer === 0 &&
+    !trickFinished &&
+    !roundFinished;
 
-function playCard(card: Card) {
-  if (!gameMode || playedCard) return;
+  const playableCards =
+    game && canPlay
+      ? getPlayableCards(
+          game.hands[0],
+          game.trick.map((play) => play.card),
+          game.gameMode
+        )
+      : [];
 
-  const ownHand = hands[0];
-
-  if (!ownHand?.some((handCard) => handCard.id === card.id)) {
-    return;
+  function dealNewRound() {
+    setDealtHands(dealCards());
+    setGame(null);
   }
 
-  const nextHands = hands.map((hand) => [...hand]);
-  const nextTrick: Card[] = [card];
+  function selectGameMode(mode: GameMode) {
+    if (game || dealtHands.length !== 4) return;
 
-  nextHands[0] = nextHands[0].filter(
-    (handCard) => handCard.id !== card.id
-  );
-
-  for (let playerIndex = 1; playerIndex < 4; playerIndex++) {
-    const botCard = chooseBotCard(
-      nextHands[playerIndex],
-      nextTrick,
-      gameMode
-);
-
-    if (!botCard) return;
-
-    nextTrick.push(botCard);
-
-    nextHands[playerIndex] = nextHands[playerIndex].filter(
-      (handCard) => handCard.id !== botCard.id
-    );
+    setGame(createGame(dealtHands, mode));
   }
 
-  setHands(nextHands);
-  setPlayedCard(card);
-  setTrick(nextTrick);
-}
+  function playCard(card: Card) {
+    if (!game || !canPlay) return;
+
+    const next = playTurn(game, card.id);
+
+    if (next === game) return;
+
+    setGame(playBotsUntilHuman(next));
+  }
+
+  function nextTrick() {
+    if (!game || !trickFinished || roundFinished) return;
+
+    setGame(startNextTrick(game));
+  }
+
   return (
     <main className="min-h-screen bg-emerald-950 p-6 text-white">
       <header className="mb-8 text-center">
@@ -100,91 +95,134 @@ function playCard(card: Card) {
 
         <button
           type="button"
-          onClick={startNewRound}
+          onClick={dealNewRound}
           className="mt-6 rounded-lg bg-amber-400 px-6 py-3 font-bold text-emerald-950 hover:bg-amber-300"
         >
           Mischen und austeilen
         </button>
       </header>
 
-{hands.length > 0 && (
-  <section className="mx-auto mb-8 max-w-5xl text-center">
-    <h2 className="mb-3 text-xl font-bold">Spielart wählen</h2>
-
-    <div className="flex flex-wrap justify-center gap-2">
-      {gameModes.map((mode) => (
-        <button
-          key={mode}
-          type="button"
-          onClick={() => {
-           if (!playedCard) setGameMode(mode);
-                }}
-          disabled={playedCard !== null}
-          aria-pressed={gameMode === mode}
-          className={`rounded-lg disabled:cursor-not-allowed disabled:opacity-60 px-4 py-2 font-bold ${
-            gameMode === mode
-              ? "bg-amber-400 text-emerald-950"
-              : "bg-emerald-800 text-white hover:bg-emerald-700"
-          }`}
-        >
-          {mode}
-        </button>
-      ))}
-    </div>
-
-    <p className="mt-4 text-emerald-200">
-      {gameMode
-        ? `Gewählte Spielart: ${gameMode}`
-        : "Wähle eine Spielart für diese Runde."}
-    </p>
-  </section>
-)}
-
       {hands.length === 0 && (
         <p className="text-center text-emerald-200">
-          Klicke auf den Button, um die Karten auszuteilen.
+          Teile zuerst die Karten aus.
         </p>
       )}
 
-      <div className="mx-auto max-w-5xl space-y-8">
-        {hands.length > 0 && (
-  <section className="mx-auto mb-8 max-w-5xl rounded-xl bg-emerald-900 p-6 text-center">
-    <h2 className="mb-4 text-xl font-bold">Auf dem Tisch</h2>
+      {hands.length > 0 && (
+        <section className="mb-8 text-center">
+          <h2 className="mb-3 text-xl font-bold">Spielart</h2>
 
-    {trick.length === 0 ? (
-      <p className="text-emerald-200">
-        {gameMode
-          ? "Klicke auf eine Karte aus deiner Hand."
-          : "Wähle zuerst eine Spielart."}
-      </p>
-    ) : (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {trick.map((card, index) => (
-          <div
-            key={card.id}
-            className="rounded-lg bg-white p-4 text-slate-800"
-          >
-            <p className="mb-2 text-sm font-bold">{players[index]}</p>
-            <p className="text-4xl">{symbols[card.suit]}</p>
-            <p className="mt-2 font-bold">{card.rank}</p>
-            <p className="text-sm">{card.suit}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {gameModes.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => selectGameMode(mode)}
+                disabled={game !== null}
+                aria-pressed={game?.gameMode === mode}
+                className={`rounded-lg px-4 py-2 font-bold disabled:cursor-not-allowed ${
+                  game?.gameMode === mode
+                    ? "bg-amber-400 text-emerald-950"
+                    : "bg-emerald-800 text-white hover:bg-emerald-700"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
-    )}
-    {winnerIndex !== null && (
-  <div className="mt-4 text-amber-300">
-    <p className="text-xl font-bold">
-      Stich gewonnen: {players[winnerIndex]}
-    </p>
-    <p className="mt-1">
-      {trickPoints} Punkte für {winnerTeam}
-    </p>
-  </div>
-)}
-  </section>
-)}
 
+          <p className="mt-3 text-emerald-200">
+            {game
+              ? `Gewählte Spielart: ${game.gameMode}`
+              : "Wähle eine Spielart. Deine Auswahl startet die Runde."}
+          </p>
+        </section>
+      )}
+
+      {game && (
+        <>
+          <section className="mx-auto mb-8 grid max-w-5xl grid-cols-2 gap-4">
+            {teams.map((team, index) => (
+              <div
+                key={team}
+                className="rounded-xl bg-emerald-800 p-4 text-center"
+              >
+                <p>{team}</p>
+                <p className="mt-1 text-3xl font-bold">
+                  {game.scores[index]}
+                </p>
+              </div>
+            ))}
+          </section>
+
+          <section className="mx-auto mb-8 max-w-5xl rounded-xl bg-emerald-900 p-6 text-center">
+            <h2 className="mb-4 text-xl font-bold">
+              Stich {Math.min(
+                game.completedTricks + (trickFinished ? 0 : 1),
+                9
+              )} von 9
+            </h2>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {game.trick.map((play) => (
+                <div
+                  key={play.card.id}
+                  className="rounded-lg bg-white p-4 text-slate-800"
+                >
+                  <p className="mb-2 text-sm font-bold">
+                    {players[play.playerIndex]}
+                  </p>
+                  <p className="text-4xl">
+                    {symbols[play.card.suit]}
+                  </p>
+                  <p className="mt-2 font-bold">{play.card.rank}</p>
+                  <p className="text-sm">{play.card.suit}</p>
+                </div>
+              ))}
+            </div>
+
+            {game.winner !== null ? (
+              <p className="mt-4 text-xl font-bold text-amber-300">
+                Stich gewonnen: {players[game.winner]}
+              </p>
+            ) : (
+              <p className="mt-4 text-emerald-200">
+                Du bist dran. Wähle eine erlaubte Karte.
+              </p>
+            )}
+
+            {trickFinished && !roundFinished && (
+              <button
+                type="button"
+                onClick={nextTrick}
+                className="mt-4 rounded-lg bg-amber-400 px-6 py-3 font-bold text-emerald-950 hover:bg-amber-300"
+              >
+                Nächster Stich
+              </button>
+            )}
+
+            {roundFinished && (
+              <div className="mt-4 text-amber-300">
+                <p className="text-xl font-bold">
+                  Runde beendet!
+                </p>
+                <p className="mt-2">
+                  {game.scores[0] === game.scores[1]
+                    ? "Unentschieden."
+                    : `Gewonnen: ${
+                        teams[game.scores[0] > game.scores[1] ? 0 : 1]
+                      }`}
+                </p>
+                <p className="mt-2">
+                  Gesamtpunkte: {game.scores[0] + game.scores[1]}
+                </p>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      <div className="mx-auto max-w-5xl space-y-8">
         {hands.map((hand, playerIndex) => (
           <section key={players[playerIndex]}>
             <h2 className="mb-3 text-xl font-bold">
@@ -192,25 +230,40 @@ function playCard(card: Card) {
             </h2>
 
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-9">
-              {hand.map((card) => (
-                <button
-  type="button"
-  onClick={() => playCard(card)}
-  disabled={playerIndex !== 0 || !gameMode || playedCard !== null}
-                  key={card.id}
-                  className={`flex aspect-[2/3] flex-col justify-between rounded-xl bg-white p-3 shadow-lg ${
-                    card.suit === "Rosen" || card.suit === "Schellen"
-                      ? "text-red-700"
-                      : "text-slate-800"
-                  }`}
-                >
-                  <span className="font-bold">{card.rank}</span>
-                  <span className="text-center text-4xl">
-                    {symbols[card.suit]}
-                  </span>
-                  <span className="text-right text-sm">{card.suit}</span>
-                </button>
-              ))}
+              {hand.map((card) => {
+                const enabled =
+                  playerIndex === 0 &&
+                  playableCards.some(
+                    (allowed) => allowed.id === card.id
+                  );
+
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => playCard(card)}
+                    disabled={!enabled}
+                    aria-label={`${card.suit} ${card.rank} spielen`}
+                    className={`flex aspect-[2/3] flex-col justify-between rounded-xl bg-white p-3 shadow-lg disabled:cursor-not-allowed ${
+                      enabled
+                        ? "cursor-pointer ring-2 ring-amber-400 hover:bg-amber-50"
+                        : "opacity-60"
+                    } ${
+                      card.suit === "Rosen" || card.suit === "Schellen"
+                        ? "text-red-700"
+                        : "text-slate-800"
+                    }`}
+                  >
+                    <span className="font-bold">{card.rank}</span>
+                    <span className="text-center text-4xl">
+                      {symbols[card.suit]}
+                    </span>
+                    <span className="text-right text-sm">
+                      {card.suit}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
         ))}
