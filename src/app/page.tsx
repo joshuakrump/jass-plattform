@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./jass-table.css";
 
 import {
@@ -17,7 +17,7 @@ import { chooseBotGameMode } from "@/lib/jass/bot";
 import {
   createGame,
   playTurn,
-  playBotsUntilHuman,
+  playBotTurn,
   startNextTrick,
   type GameState,
 } from "@/lib/jass/game";
@@ -65,6 +65,24 @@ export default function Home() {
         )
       : [];
 
+  useEffect(() => {
+    if (
+      !game ||
+      game.currentPlayer === 0 ||
+      game.trick.length === 4 ||
+      game.completedTricks >= 9
+    ) return;
+
+    const timer = window.setTimeout(() => {
+      // Die Zufallsauswahl erfolgt ausserhalb des React-State-Updaters.
+      const next = playBotTurn(game);
+      setGame((current) => current === game ? next : current);
+    }, 650);
+
+    // Ein neuer Spielstand oder Neustart verwirft den vorherigen Timer.
+    return () => window.clearTimeout(timer);
+  }, [game]);
+
   function dealNewRound() {
     setDealtHands(dealCards());
     setGame(null);
@@ -84,7 +102,7 @@ export default function Home() {
 
     if (next === game) return;
 
-    setGame(playBotsUntilHuman(next));
+    setGame((current) => current === game ? next : current);
   }
 
   function shiftToPartner() {
@@ -96,7 +114,7 @@ export default function Home() {
   function nextTrick() {
     if (!game || !trickFinished || roundFinished) return;
 
-    setGame(startNextTrick(game));
+    setGame((current) => current === game ? startNextTrick(game, false) : current);
   }
 
   const firstTrick = game?.history.length === 1 ? game.history[0] : null;
@@ -150,7 +168,7 @@ export default function Home() {
           </div>
 
           {visibleSeats.map((playerIndex) => (
-            <div key={playerIndex} className={`jass-seat jass-seat-${playerIndex}`}>
+            <div key={playerIndex} className={`jass-seat jass-seat-${playerIndex} ${game?.currentPlayer === playerIndex && !trickFinished && !roundFinished ? "jass-seat-active" : ""}`}>
               <div className="jass-avatar" aria-hidden="true">{playerIndex === 2 ? "P" : playerIndex}</div>
               <strong>{players[playerIndex]}</strong>
               <span>{playerIndex === 2 ? "Dein Partner" : "Gegner"}</span>
@@ -199,7 +217,7 @@ export default function Home() {
               <button type="button" onClick={nextTrick} className="jass-button jass-button-primary">Nächster Stich</button>
             </>
           ) : (
-            <p>Du bist dran. Wähle eine erlaubte Karte.</p>
+            <p>{game.currentPlayer === 0 ? "Du bist dran. Wähle eine erlaubte Karte." : `${players[game.currentPlayer]} ist dran …`}</p>
           )}
         </section>
 
